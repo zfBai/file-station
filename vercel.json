@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "download.mltd-imagesaving.site" }],
+      "destination": "/api/index?dl=:path"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?path=:path"
+    }
+  ]
+}

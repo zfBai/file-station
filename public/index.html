@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件传输站</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", system-ui, sans-serif;
+    background: #0f1115; color: #e6e8eb; min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid #23262e; flex-wrap: wrap; gap: 12px;
+  }
+  header h1 { font-size: 20px; }
+  .login-area, .user-area { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  input {
+    background: #1a1d24; border: 1px solid #2e3340; color: #e6e8eb;
+    padding: 7px 10px; border-radius: 6px;
+  }
+  input::placeholder { color: #5c6472; }
+  button {
+    border: 1px solid #2e3340; background: #1f242e; color: #e6e8eb;
+    padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  button:hover { background: #2a3140; }
+  button.primary { background: #2b5dcc; border-color: #2b5dcc; }
+  button.primary:hover { background: #3568de; }
+  button.danger:hover { background: #3d2226; border-color: #6b3338; color: #ff8080; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .link-btn { background: none; border: none; color: #4d9fff; cursor: pointer; padding: 4px; font-size: 12px; }
+  .link-btn:hover { text-decoration: underline; background: none; }
+  a { color: #4d9fff; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .panel { background: #14171d; border: 1px solid #23262e; border-radius: 12px; padding: 20px; }
+  .panel h2 { font-size: 15px; margin-bottom: 14px; color: #cfd4dc; font-weight: normal; }
+  .panel h2 .sub { font-size: 12px; color: #5c6472; margin-left: 8px; }
+  #dropzone {
+    border: 2px dashed #3a4150; border-radius: 12px; padding: 32px;
+    text-align: center; cursor: pointer; transition: all .2s; color: #9aa3b2;
+  }
+  #dropzone.dragging { border-color: #4d9fff; background: #16202e; color: #4d9fff; }
+  #dropzone.disabled { cursor: not-allowed; opacity: .5; }
+  #dropzone input[type=file] { display: none; }
+  .status { margin-top: 12px; font-size: 14px; min-height: 20px; color: #8b93a1; }
+  .status.error { color: #ff6b6b; }
+  .status.ok { color: #5bd18a; }
+  /* 上传进度条 */
+  .progress { margin-top: 14px; height: 8px; background: #1a1d24; border-radius: 4px; overflow: hidden; }
+  .progress .bar { height: 100%; width: 0; background: #2b5dcc; transition: width .15s; }
+  /* 上传成功后的密码卡片 */
+  .result { margin-top: 16px; background: #16202e; border: 1px solid #2b5dcc; border-radius: 10px; padding: 18px; }
+  .result .label { font-size: 12px; color: #8b93a1; margin-bottom: 6px; }
+  .pw {
+    font-family: Consolas, "Courier New", monospace; font-size: 32px; font-weight: bold;
+    letter-spacing: 3px; color: #7db4ff; user-select: all; word-break: break-all;
+  }
+  .result .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .result .meta { font-size: 12px; color: #8b93a1; line-height: 1.8; }
+  .open-row { display: flex; gap: 10px; }
+  .open-row input { flex: 1; font-family: Consolas, monospace; font-size: 16px; letter-spacing: 2px; text-transform: uppercase; }
+  .card {
+    border: 1px solid #262a34; border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .card .info { font-size: 13px; min-width: 0; }
+  .card .fname { word-break: break-all; margin-bottom: 4px; }
+  .card .meta { font-size: 12px; color: #8b93a1; }
+  .card .ops { display: flex; gap: 8px; }
+  .empty { text-align: center; color: #5c6472; padding: 24px 0; font-size: 13px; }
+  .warn { color: #ffd966; font-size: 12px; line-height: 1.8; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #232833; border: 1px solid #363d4c; padding: 10px 18px;
+    border-radius: 8px; font-size: 14px; display: none; z-index: 99; white-space: pre-line;
+  }
+  .toast.show { display: block; }
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-mask.show { display: flex; }
+  .modal { background: #171a21; border: 1px solid #2e3340; border-radius: 12px; padding: 24px; width: 340px; }
+  .modal h3 { margin-bottom: 16px; font-size: 16px; }
+  .modal .row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .modal .row label { font-size: 12px; color: #8b93a1; }
+  .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💾 文件传输站</h1>
+  <!-- 未登录：用图片保存站的账号登录 -->
+  <div class="login-area" id="loginArea">
+    <input id="loginUser" placeholder="用户名" maxlength="20">
+    <input id="loginPass" type="password" placeholder="密码">
+    <button class="primary" onclick="doLogin()">登录</button>
+    <button class="link-btn" onclick="openHelp()">没有账号？</button>
+  </div>
+  <!-- 已登录 -->
+  <div class="user-area" id="userArea" style="display:none">
+    <span>👤 <b id="curUser"></b></span>
+    <button class="link-btn" onclick="doLogout()">退出</button>
+  </div>
+</header>
+
+<main>
+  <!-- 发送文件 -->
+  <section class="panel">
+    <h2>发送文件 <span class="sub">把 ZIP / RAR / 7Z 拖进来，拿到密码后发给对方</span></h2>
+    <div id="dropzone">
+      <div style="font-size:32px;margin-bottom:8px">📦</div>
+      <div>点击选择压缩包，或直接拖到这里</div>
+      <div style="font-size:12px;margin-top:6px;color:#5c6472">
+        仅支持 ZIP / RAR / 7Z · 单个最大 300MB · 上传后 30 分钟自动删除
+      </div>
+      <input type="file" id="file" accept=".zip,.rar,.7z">
+    </div>
+    <div class="progress" id="progressWrap" style="display:none"><div class="bar" id="progressBar"></div></div>
+    <div class="status" id="status"></div>
+
+    <!-- 上传完成：展示密码 -->
+    <div class="result" id="uploadResult" style="display:none">
+      <div class="label">把下面这串密码发给对方，让他在本页「接收文件」里输入：</div>
+      <div class="pw" id="pwText"></div>
+      <div class="row">
+        <button class="primary" onclick="copyPw()">复制密码</button>
+        <button onclick="copyLink()">复制下载链接</button>
+        <span class="meta" id="uploadMeta"></span>
+      </div>
+      <div class="row"><span class="warn" id="uploadWarn"></span></div>
+    </div>
+  </section>
+
+  <!-- 接收文件 -->
+  <section class="panel">
+    <h2>接收文件 <span class="sub">输入对方给你的密码</span></h2>
+    <div class="open-row">
+      <input id="openPw" placeholder="K7M2-QP93" maxlength="12" autocomplete="off">
+      <button class="primary" onclick="doOpen()">获取文件</button>
+    </div>
+    <div class="status" id="openStatus"></div>
+    <div id="openResult"></div>
+  </section>
+
+  <!-- 我上传的文件 -->
+  <section class="panel" id="minePanel" style="display:none">
+    <h2>我上传的文件 <span class="sub">30 分钟内有效，可提前删除</span>
+      <button class="link-btn" onclick="loadMine()">刷新</button>
+    </h2>
+    <div id="mineList"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- 没有账号的说明弹窗 -->
+<div class="modal-mask" id="helpMask">
+  <div class="modal">
+    <h3>关于账号</h3>
+    <div style="font-size:13px;color:#9aa3b2;line-height:1.9">
+      本站和图床共用同一套账号，<b style="color:#e6e8eb">不用单独注册</b>：<br><br>
+      · 已有图片保存站账号 → 直接在本页登录<br>
+      · 还没有账号 → 去
+      <a href="https://image.mltd-imagesaving.site" target="_blank">图片保存站</a>
+      注册一个，回来就能用<br><br>
+      <span style="font-size:12px;color:#5c6472">接收文件的人不需要登录，输密码就行。</span>
+    </div>
+    <div class="actions"><button class="primary" onclick="closeModal('helpMask')">知道了</button></div>
+  </div>
+</div>
+
+<script>
+// ==================== 状态 ====================
+// 本地大小上限和有效期，与 api/core.js 的默认值保持一致（改环境变量时这里也要改，仅影响提示文案）
+const MAX_FILE = 300 * 1024 * 1024
+const ALLOWED_EXT = ['zip', 'rar', '7z']
+
+const state = {
+  user: localStorage.getItem('file_user') || '',
+  pass: localStorage.getItem('file_pass') || '',
+  lastPassword: '',   // 最近一次上传得到的密码
+  lastUrl: '',        // 最近一次上传的下载链接
+  lastExpiresAt: 0,   // 最近一次上传的过期时间
+}
+const $ = id => document.getElementById(id)
+let toastTimer = null
+function toast(msg) {
+  const t = $('toast')
+  t.textContent = msg
+  t.classList.add('show')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000)
+}
+function closeModal(id) { $(id).classList.remove('show') }
+function openHelp() { $('helpMask').classList.add('show') }
+
+// ==================== 工具 ====================
+function fmtSize(bytes) {
+  if (bytes == null) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB'
+}
+// 剩余时间：2分10秒 / 45秒 / 已过期
+function fmtLeft(sec) {
+  if (sec <= 0) return '已过期'
+  const m = Math.floor(sec / 60), s = sec % 60
+  return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`
+}
+// 128 位随机令牌：下载链接就靠它保密，猜不出来
+function randomToken() {
+  const b = new Uint8Array(16)
+  crypto.getRandomValues(b)
+  return Array.from(b, x => x.toString(16).padStart(2, '0')).join('')
+}
+// 文件名清洗：与服务端 isSafeFileName 的规则对齐，去掉路径分隔符和危险字符
+function sanitizeName(raw) {
+  const s = String(raw || '')
+    .split('').filter(ch => ch.charCodeAt(0) > 31 && ch.charCodeAt(0) !== 127).join('')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return s.slice(0, 80) || 'file.zip'
+}
+function extOf(name) { return (String(name).match(/\.([^.]+)$/)?.[1] || '').toLowerCase() }
+// 本地联调（node dev-server.js）时浏览器直传不了 Vercel Blob，改走后端内存存储
+function isLocal() {
+  return location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+}
+// 本地预览时把下载链接换成本机路径，才能点得动（线上一律走 download 域名）
+function localUrl(u) {
+  return isLocal() ? String(u).replace(/^https:\/\/download\.mltd-imagesaving\.site/, BASE + '/dl') : u
+}
+
+// 统一请求：自动带登录凭证
+const BASE = location.pathname.replace(/\/+$/, '')
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) }
+  if (state.user) { headers['x-user'] = state.user; headers['x-password'] = state.pass }
+  const res = await fetch(BASE + path, { ...opts, headers })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || '请求失败 (' + res.status + ')')
+  return data
+}
+
+// ==================== 登录 / 退出 ====================
+async function doLogin() {
+  const username = $('loginUser').value.trim()
+  const password = $('loginPass').value
+  if (!username || !password) return toast('请输入用户名和密码')
+  try {
+    // 直接调图床的登录接口验证，本站不单独存账号
+    const res = await fetch('https://image.mltd-imagesaving.site/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || '登录失败')
+    state.user = data.username
+    state.pass = password
+    localStorage.setItem('file_user', state.user)
+    localStorage.setItem('file_pass', state.pass)
+    renderUser()
+    toast(`欢迎回来，${state.user}`)
+    loadMine()
+  } catch (e) { toast('❌ ' + e.message) }
+}
+function doLogout() {
+  state.user = ''; state.pass = ''
+  localStorage.removeItem('file_user'); localStorage.removeItem('file_pass')
+  renderUser()
+  $('minePanel').style.display = 'none'
+  $('status').textContent = ''
+  toast('已退出登录')
+}
+function renderUser() {
+  const on = !!state.user
+  $('loginArea').style.display = on ? 'none' : 'flex'
+  $('userArea').style.display = on ? 'flex' : 'none'
+  $('curUser').textContent = state.user
+  $('dropzone').classList.toggle('disabled', !on)
+  if (on) {
+    $('status').textContent = ''
+    $('minePanel').style.display = 'block'
+  }
+}
+
+// ==================== 直传到 Vercel Blob ====================
+// 为什么不用 fetch：fetch 拿不到上传进度，300MB 的包没进度条体验太差。
+// 为什么直接用 XHR 打 blob.vercel-storage.com：这是 @vercel/blob/client 的
+// 官方直传协议（先向本站 /api/upload 换一次性令牌，再带令牌 PUT），
+// 好处是不用引第三方 CDN 的 SDK，国内打开页面不会被 CDN 拖慢。
+function putToBlob(url, file, headers, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url, true)
+    for (const [k, v] of Object.entries(headers || {})) xhr.setRequestHeader(k, v)
+    // 压缩包的 MIME：浏览器给的不可靠（.7z 常常是空），按扩展名兜底
+    const mime = { zip: 'application/zip', rar: 'application/vnd.rar', '7z': 'application/x-7z-compressed' }[extOf(file.name)] || 'application/octet-stream'
+    xhr.setRequestHeader('x-content-type', mime)
+    xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total) }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error('上传失败 (' + xhr.status + ')：' + String(xhr.responseText || '').slice(0, 200)))
+    }
+    xhr.onerror = () => reject(new Error('上传失败，请检查网络后重试'))
+    xhr.onabort = () => reject(new Error('上传已取消'))
+    xhr.send(file)
+  })
+}
+
+// ==================== 上传流程 ====================
+async function handleFile(file) {
+  if (!state.user) return toast('请先登录')
+  const status = $('status')
+  const ext = extOf(file.name)
+  if (!ALLOWED_EXT.includes(ext)) {
+    status.className = 'status error'
+    status.textContent = `❌ ${file.name}：只支持 ZIP / RAR / 7Z 压缩包`
+    return
+  }
+  if (file.size > MAX_FILE) {
+    status.className = 'status error'
+    status.textContent = `❌ ${file.name}：超过 300MB 上限`
+    return
+  }
+
+  $('uploadResult').style.display = 'none'
+  $('progressWrap').style.display = 'block'
+  $('progressBar').style.width = '0%'
+  status.className = 'status'
+  status.textContent = `准备上传：${file.name}`
+  setDropzoneEnabled(false)
+
+  const token = randomToken()
+  const pathname = `f/${token}/${sanitizeName(file.name)}`
+  const onProgress = p => { $('progressBar').style.width = Math.round(p * 100) + '%' }
+  try {
+    if (isLocal()) {
+      // 本地联调：没有真实 Blob，走后端内存存储（见 core.js 的 /api/local-upload）
+      status.textContent = '上传中（本地模式）...'
+      await putToBlob(
+        BASE + '/api/local-upload?pathname=' + encodeURIComponent(pathname),
+        file, { 'x-user': state.user, 'x-password': state.pass }, onProgress)
+    } else {
+      // 第一步：向本站换一次性直传令牌（未登录会被拒）
+      const { clientToken } = await api('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'blob.generate-client-token',
+          payload: {
+            pathname,
+            callbackUrl: location.origin + BASE + '/api/upload',
+            clientPayload: JSON.stringify({ size: file.size }),
+            multipart: false,
+          },
+        }),
+      })
+      // 第二步：带着令牌把文件直接 PUT 给 Blob（不经过本站函数，所以能传大文件）
+      status.textContent = `上传中：${file.name}`
+      const storeId = clientToken.split('_')[3] || ''
+      await putToBlob(
+        'https://blob.vercel-storage.com/?pathname=' + encodeURIComponent(pathname),
+        file,
+        {
+          authorization: 'Bearer ' + clientToken,
+          'x-api-version': '9',
+          'x-api-blob-request-id': storeId + ':' + Date.now() + ':' + Math.random().toString(16).slice(2),
+          'x-api-blob-request-attempt': '0',
+        },
+        onProgress)
+    }
+
+    // 第三步：登记并换密码
+    status.textContent = '正在生成取件密码...'
+    const data = await api('/api/finish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    $('progressBar').style.width = '100%'
+    status.className = 'status ok'
+    status.textContent = `✅ 上传完成：${data.name}`
+
+    state.lastPassword = data.password
+    state.lastUrl = localUrl(data.url)
+    state.lastExpiresAt = data.expiresAt
+    $('pwText').textContent = data.password
+    $('uploadMeta').textContent = `${data.name} · ${fmtSize(data.size)} · ${data.ttlMinutes} 分钟后过期`
+    $('uploadResult').style.display = 'block'
+    tickResult()
+    loadMine()
+  } catch (e) {
+    status.className = 'status error'
+    status.textContent = '❌ ' + e.message
+  } finally {
+    $('progressWrap').style.display = 'none'
+    setDropzoneEnabled(true)
+    $('file').value = ''
+  }
+}
+
+function setDropzoneEnabled(on) {
+  $('dropzone').classList.toggle('disabled', !on || !state.user)
+}
+// 上传结果卡片的倒计时（每秒刷新一次）
+function tickResult() {
+  if (!state.lastExpiresAt) return
+  const left = Math.floor((state.lastExpiresAt - Date.now()) / 1000)
+  $('uploadWarn').textContent = left > 0
+    ? `⏳ 还有 ${fmtLeft(left)} 自动删除，请尽快把密码发给对方`
+    : '⌛ 文件已过期删除，链接和密码都失效了，请重新上传'
+}
+setInterval(tickResult, 1000)
+// 「我的文件」列表里的倒计时也一起刷新
+setInterval(() => { if ($('minePanel').style.display !== 'none') tickMine() }, 1000)
+
+async function copyPw() {
+  if (!state.lastPassword) return
+  try {
+    await navigator.clipboard.writeText(state.lastPassword)
+    toast('✅ 密码已复制，发给对方即可')
+  } catch { window.prompt('手动复制密码：', state.lastPassword) }
+}
+async function copyLink() {
+  if (!state.lastUrl) return
+  try {
+    await navigator.clipboard.writeText(state.lastUrl)
+    toast('✅ 下载链接已复制')
+  } catch { window.prompt('手动复制链接：', state.lastUrl) }
+}
+
+// ==================== 取件 ====================
+let openInfo = null // 当前取到的文件信息
+
+async function doOpen() {
+  const password = $('openPw').value.trim()
+  const status = $('openStatus')
+  if (!password) return toast('请输入密码')
+  status.className = 'status'
+  status.textContent = '查询中...'
+  $('openResult').innerHTML = ''
+  try {
+    openInfo = await api('/api/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    })
+    openInfo.url = localUrl(openInfo.url)
+    status.className = 'status ok'
+    status.textContent = '✅ 找到文件了'
+    renderOpen()
+  } catch (e) {
+    status.className = 'status error'
+    status.textContent = '❌ ' + e.message
+    openInfo = null
+  }
+}
+function renderOpen() {
+  if (!openInfo) return
+  $('openResult').innerHTML = `
+    <div class="card">
+      <div class="info">
+        <div class="fname">📦 ${escapeHtml(openInfo.name)}</div>
+        <div class="meta">${fmtSize(openInfo.size)} · <span id="openLeft">${fmtLeft(openInfo.remainingSeconds)}</span> 后自动删除</div>
+      </div>
+      <div class="ops">
+        <button class="primary" onclick="downloadNow()">下载</button>
+        <button onclick="copyOpenLink()">复制链接</button>
+      </div>
+    </div>`
+  setInterval(() => {
+    if (!openInfo) return
+    const left = Math.floor((openInfo.expiresAt - Date.now()) / 1000)
+    const el = $('openLeft')
+    if (el) el.textContent = fmtLeft(left)
+  }, 1000)
+}
+// 直接用 location.href 打开，download 域名会 302 到 Blob 直链
+function downloadNow() { if (openInfo) location.href = openInfo.url }
+async function copyOpenLink() {
+  if (!openInfo) return
+  try {
+    await navigator.clipboard.writeText(openInfo.url)
+    toast('✅ 链接已复制（30 分钟内有效）')
+  } catch { window.prompt('手动复制链接：', openInfo.url) }
+}
+
+// ==================== 我上传的文件 ====================
+let mineItems = []
+async function loadMine() {
+  if (!state.user) return
+  try {
+    mineItems = (await api('/api/mine')).map(it => ({ ...it, url: localUrl(it.url) }))
+    renderMine()
+  } catch (e) {
+    // 凭证失效就退回登录界面
+    if (String(e.message).includes('登录') || String(e.message).includes('用户不存在')) doLogout()
+  }
+}
+function renderMine() {
+  const list = $('mineList')
+  if (!mineItems.length) {
+    list.innerHTML = '<div class="empty">最近 30 分钟没有上传记录</div>'
+    return
+  }
+  list.innerHTML = mineItems.map((it, i) => `
+    <div class="card">
+      <div class="info">
+        <div class="fname">📦 ${escapeHtml(it.name)}</div>
+        <div class="meta">${fmtSize(it.size)} · <span class="left" data-i="${i}">${fmtLeft(it.remainingSeconds)}</span> 后自动删除</div>
+      </div>
+      <div class="ops">
+        <button onclick="location.href=mineItems[${i}].url">下载</button>
+        <button onclick="copyMineLink(${i})">复制链接</button>
+        <button class="danger" onclick="removeMine('${it.token}')">删除</button>
+      </div>
+    </div>`).join('')
+}
+function tickMine() {
+  document.querySelectorAll('#mineList .left').forEach(el => {
+    const it = mineItems[Number(el.dataset.i)]
+    if (it) el.textContent = fmtLeft(Math.floor((it.expiresAt - Date.now()) / 1000))
+  })
+}
+async function copyMineLink(i) {
+  try {
+    await navigator.clipboard.writeText(mineItems[i].url)
+    toast('✅ 链接已复制')
+  } catch { window.prompt('手动复制链接：', mineItems[i].url) }
+}
+async function removeMine(token) {
+  if (!confirm('确定删除这个文件吗？删除后对方就拿不到了。')) return
+  try {
+    await api('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    toast('已删除')
+    loadMine()
+  } catch (e) { toast('❌ ' + e.message) }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+
+// ==================== 事件绑定 ====================
+const dz = $('dropzone')
+dz.addEventListener('click', () => { if (state.user) $('file').click() })
+$('file').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]) })
+;['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('dragging') }))
+;['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('dragging') }))
+dz.addEventListener('drop', e => {
+  if (!state.user) return toast('请先登录')
+  const f = e.dataTransfer.files[0]
+  if (f) handleFile(f)
+})
+$('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+$('openPw').addEventListener('keydown', e => { if (e.key === 'Enter') doOpen() })
+document.querySelectorAll('.modal-mask').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show') }))
+
+// ==================== 启动 ====================
+renderUser()
+if (state.user) loadMine()
+</script>
+</body>
+</html>
