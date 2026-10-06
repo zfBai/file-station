@@ -183,6 +183,26 @@ git push -u origin main
 
 ## 六、常见问题
 
+**Q：`git push` 报 `Recv failure: Connection was reset`？**
+
+这是网络把 `github.com` 解析到了一个连不通的 IP（`api.github.com`、`codeload.github.com`
+通常还是好的，所以症状很迷惑）。先找一个能用的 IP：
+
+```bash
+nslookup github.com          # 看当前解析到哪个（多半不通）
+for ip in 140.82.112.4 20.27.177.113 20.205.243.166; do
+  curl -s -o /dev/null -m 6 -w "$ip → %{http_code}\n" --resolve "github.com:443:$ip" https://github.com
+done
+```
+
+挑回 `200` 的那个，写进 git 全局配置（只对 github.com 生效，`<IP>` 换成上一步的结果）：
+
+```bash
+git config --global http.curloptResolve "github.com:443:<IP>"
+```
+
+IP 会变，以后再推不动就重跑这两步。想撤掉这条配置：`git config --global --unset http.curloptResolve`。
+
 **Q：点下载没反应 / 一直转圈？**
 先直接访问 `https://<store-id>.public.blob.vercel-storage.com` 看通不通。
 `vercel-storage.com` 在部分网络环境下可能被污染，如果确实打不开，
