@@ -253,11 +253,11 @@ async function doLogin() {
   const password = $('loginPass').value
   if (!username || !password) return toast('请输入用户名和密码')
   try {
-    // 直接调图床的登录接口验证，本站不单独存账号
-    const res = await fetch('https://image.mltd-imagesaving.site/api/login', {
+    // 调本站自己的登录接口（同源，不会跨域被拦）。
+    // 账号仍由图床统一管理，本站只读 _users/ 不写入。
+    const res = await fetch(BASE + '/api/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      headers: { 'x-user': username, 'x-password': password },
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.error || '登录失败')

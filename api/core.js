@@ -178,6 +178,9 @@ async function route(urlPath, httpMethod, event) {
   }
   // ---- 公开接口 ----
   if (urlPath === '/api/open' && httpMethod === 'POST') return await open(event)
+  // 登录接口：只用来让前端确认凭证对不对。本站不签发会话，
+  // 后续每个请求照样带 x-user/x-password 重新校验一次。
+  if (urlPath === '/api/login' && httpMethod === 'POST') return await login(event)
   // ---- 本地联调专用：模拟浏览器直传（只在本机内存模式下存在，生产环境这个路由直接 404） ----
   if (urlPath === '/api/local-upload' && httpMethod === 'PUT') return await localUpload(event)
   // ---- 登录后可用的接口 ----
@@ -201,6 +204,15 @@ async function auth(event) {
   if (user.banned) throw new HttpError(403, '账号已被封禁，请联系管理员')
   if (!verifyPassword(password, user.salt, user.passHash)) throw new HttpError(401, '密码错误')
   return user
+}
+
+// ============ 登录 ============
+// 前端登录时调这个（同源，不需要 CORS）。
+// 早先是直接调图床的 /api/login，但那是跨域请求，浏览器预检会被拦下（Failed to fetch），
+// 而且图床那边也没返回 CORS 头 —— 本站自己就能校验，何必绕一圈。
+async function login(event) {
+  const user = await auth(event)
+  return json(200, { ok: true, username: user.username, role: user.role })
 }
 
 // ============ 直传令牌签发 ============

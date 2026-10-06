@@ -82,6 +82,14 @@ async function runTests() {
   eq(r.status, 403, '被封禁账号返回 403')
   r = await call('/api/mine', 'GET', { headers: auth('zfbai', 'siBAIsiBAI') })
   eq(r.status, 200, '正确凭证通过')
+  // 登录接口：前端靠它确认凭证（同源，不跨域调图床）
+  r = await call('/api/login', 'POST', { headers: auth('zfbai', 'siBAIsiBAI') })
+  eq(r.status, 200, '登录接口凭证正确返回 200')
+  eq(r.data.username, 'zfbai', '登录成功返回用户名')
+  r = await call('/api/login', 'POST', { headers: auth('zfbai', 'nope') })
+  eq(r.status, 401, '登录接口密码错误返回 401')
+  r = await call('/api/login', 'POST', { headers: auth('blocked', '123456') })
+  eq(r.status, 403, '登录接口封禁账号返回 403')
 
   // ---------- 2. 签发直传令牌 ----------
   console.log('== 2. 签发直传令牌 ==')
